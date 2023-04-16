@@ -190,7 +190,6 @@ class Experiment:
         classes,_,idx_to_class = get_classes_indices_mapping(self.args.data_dir)
         
         best_model = self.model
-        best_model.load_state_dict(torch.load(self.args.save_dir+"best_model.pt"))
         
         best_model.to(self.args.device)
         best_model.eval()
@@ -221,8 +220,7 @@ def tuning_session(config, args):
     
     args.lr = config["lr"]
     args.batch_size = config["batch_size"]
-    args.epochs = config["epochs"]
-    args.save_dir = args.save_dir + f"lr{args.lr}-b{args.batch_size}-e{args.epochs}/"
+    args.save_dir = args.save_dir + f"lr{args.lr}-b{args.batch_size}/"
     
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)

@@ -27,7 +27,7 @@ if __name__ == "__main__":
     
     # Experiment Config
     parser.add_argument("--model", type=str, default="resnet50")
-    parser.add_argument("-ep","--epochs", type=int, default=10)
+    parser.add_argument("-ep","--epochs", type=int, default=20)
     parser.add_argument("-b", "--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-4)
     
@@ -61,8 +61,6 @@ if __name__ == "__main__":
     
     # Experiment Section
     
-    
-    
     if args.hyper_tune:
         # TODO
         # Debugging
@@ -72,8 +70,7 @@ if __name__ == "__main__":
         
         search_space = {
             "lr": tune.loguniform(1e-4, 1e-2),
-            "batch_size": tune.grid_search([32, 64]),
-            "epochs": tune.grid_search([10, 20])
+            "batch_size": tune.grid_search([32, 64])
         }
         
         tuner = tune.Tuner(
@@ -85,7 +82,7 @@ if __name__ == "__main__":
             tune_config=tune.TuneConfig(
                 metric="accuracy",
                 mode="max",
-                # search_alg=OptunaSearch(),
+                # search_alg=OptunaSearch(), # If not specified, it uses RandomSearch
                 num_samples=2
             )
         )
@@ -101,19 +98,22 @@ if __name__ == "__main__":
             best_result.metrics["accuracy"]))
         print("="*20)
         
-        best_model_path = f"../results/ht-{args.model}-{es}p{args.patience}-dl{args.es_delta}/lr{best_result.config["lr"]}-b{best_result.config["batch_size"]}-e{best_result.config["epochs"]}/best_model.pt"
+        es = "es-" if args.early_stop else ""
+        ss = "ss-" if args.small_sample else ""
+        best_model_path = f"../results/{ss}ht-{args.model}-ep{args.epochs}-{es}p{args.patience}-dl{args.es_delta}/lr{best_result.config['lr']}-b{best_result.config['batch_size']}/best_model.pt"
         
         test_exp = Experiment(args)
         test_exp.load_checkpoint(best_model_path)
         results = test_exp.pred_on_test()
         results.to_csv(args.save_dir+"results.csv", index=False)
         
-        
     else:
         print("INFO: This is a training session.")
         print()
         exp = Experiment(args)
         exp.fit()
+        
+        exp.load_checkpoint(args.save_dir+"best_model.pt")
         results = exp.pred_on_test()
         results.to_csv(args.save_dir+"results.csv", index=False)
         

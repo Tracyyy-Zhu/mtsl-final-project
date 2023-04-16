@@ -35,11 +35,12 @@ class EarlyStopping():
 def prepare_save_folder(args):
     ht = "ht" if args.hyper_tune else ""
     es = "es-" if args.early_stop else ""
+    ss = "ss-" if args.small_sample else ""
     if not args.hyper_tune:
-        directory = f"../results/{args.model}-ep{args.epochs}-b{args.batch_size}-lr{args.lr}-{es}p{args.patience}-dl{args.es_delta}/"
+        directory = f"../results/{ss}{args.model}-ep{args.epochs}-b{args.batch_size}-lr{args.lr}-{es}p{args.patience}-dl{args.es_delta}/"
     else:
         abs_path = os.path.abspath("../results")
-        directory = f"{abs_path}/{ht}-{args.model}-{es}p{args.patience}-dl{args.es_delta}/"
+        directory = f"{abs_path}/{ss}{ht}-{args.model}-ep{args.epochs}-{es}p{args.patience}-dl{args.es_delta}/"
     
     if not os.path.exists(directory):
         os.makedirs(directory)

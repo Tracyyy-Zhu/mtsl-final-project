@@ -19,8 +19,8 @@ def init_pretrained_model(model_name: str):
     """
     Loading pretrained model base on model name
     """
-    
+    torch.hub.set_dir("../.cache")
     if model_name == "resnet50":
-        return torch.hub.load("pytorch/vision", "resnet50", weights="IMAGENET1K_V2")
+        return torch.hub.load("pytorch/vision:v0.13.1", "resnet50", weights="IMAGENET1K_V2")
     else:
         raise Exception(f"Model {model_name} not supported yet.")

@@ -77,8 +77,6 @@ def get_val_trans(image_size=224):
 
     
 
-
-
 #################
 ##  Functions  ##
 #################
