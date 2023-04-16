@@ -8,7 +8,7 @@ import pandas as pd
 
 
 import models
-from models import ResNet
+from models import Model
 from dataset import get_train_trans, get_val_trans, get_train_val_loader, test_image_loader, get_classes_indices_mapping
 
 from utils import EarlyStopping
@@ -29,7 +29,7 @@ class Experiment:
         self.args = args
         
         classes, _, _ = get_classes_indices_mapping(self.args.data_dir)
-        self.model = ResNet(self.args.model, len(classes))
+        self.model = Model(self.args.model, len(classes))
         self.criterion = torch.nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.args.lr)
         

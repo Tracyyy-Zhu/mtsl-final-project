@@ -83,7 +83,7 @@ if __name__ == "__main__":
                 metric="accuracy",
                 mode="max",
                 # search_alg=OptunaSearch(), # If not specified, it uses RandomSearch
-                num_samples=2
+                num_samples=5
             )
         )
         
