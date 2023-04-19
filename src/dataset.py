@@ -50,26 +50,57 @@ class IdentityTransform(object):
     
     def __call__(self, data):
         return data
+    
+class Lighting(object):
+    """
+    Lighting noise(AlexNet - style PCA - based noise)
+    https://github.com/zhanghang1989/PyTorch-Encoding/blob/master/experiments/recognition/dataset/minc.py
+    """
+    def __init__(self, alphastd, eigval=torch.Tensor([0.2175, 0.0188, 0.0045]), eigvec=torch.Tensor([[-0.5675,  0.7192,  0.4009], [-0.5808, -0.0045, -0.8140], [-0.5836, -0.6948,  0.4203]])):
+        self.alphastd = alphastd
+        self.eigval = eigval
+        self.eigvec = eigvec
 
-def get_train_trans(image_size=224, data_aug = IdentityTransform()):
+    def __call__(self, img):
+        if self.alphastd == 0:
+            return img
+
+        alpha = img.new().resize_(3).normal_(0, self.alphastd)
+        rgb = self.eigvec.type_as(img).clone()\
+            .mul(alpha.view(1, 3).expand(3, 3))\
+            .mul(self.eigval.view(1, 3).expand(3, 3))\
+            .sum(1).squeeze()
+
+        return img.add(rgb.view(3, 1, 1).expand_as(img))
+
+def get_train_trans(image_size=224, data_aug = False):
     """
     Transform function for processing images in the training set.
     """
-
-    return transforms.Compose([
-        # TODO Fit the data aug function in
-        data_aug,
-        transforms.CenterCrop(image_size),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
+    if data_aug:
+        return transforms.Compose([
+            transforms.RandomCrop(image_size, pad_if_needed=True),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            transforms.RandomRotation(degrees=(60, 90)),
+            transforms.RandomHorizontalFlip(),
+            transforms.GaussianBlur(7, sigma=(0.1, 1.0)),
+            #transforms.ColorJitter(brightness=0.1, saturation=0.1),
+            Lighting(0.9),
+            transforms.RandomErasing(),
+        ])
+    else: 
+        return transforms.Compose([
+            transforms.CenterCrop(image_size),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
     
 def get_val_trans(image_size=224):
     """
     Transform function for processing images in the validation/test set.
     """
     return transforms.Compose([
-        # TODO Fit the data aug function in
         transforms.CenterCrop(image_size),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])

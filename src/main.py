@@ -36,10 +36,7 @@ if __name__ == "__main__":
     parser.add_argument("--es-delta", type=float, default=0.0)
     
     # TODO
-    # Cyclic LR and Data aug
-    # Need to edit the utils.prepare_save_folder as well
-#     parser.add_argument("--cycLR") 
-#     parser.add_argument("--data-aug") 
+    parser.add_argument("--data-aug", dest="data_aug", action="store_true")
     
     args = parser.parse_args()
     
@@ -62,15 +59,13 @@ if __name__ == "__main__":
     # Experiment Section
     
     if args.hyper_tune:
-        # TODO
-        # Debugging
         print("INFO: This is a hyperparameter tuning session.")
         print()
         args.data_dir = os.path.abspath("../data") + "/"
         
         search_space = {
-            "lr": tune.loguniform(1e-4, 1e-2),
-            "batch_size": tune.grid_search([32, 64])
+            "lr": tune.loguniform(1e-5, 1e-3),
+            "batch_size": tune.grid_search([32, 64, 128])
         }
         
         tuner = tune.Tuner(
@@ -100,7 +95,8 @@ if __name__ == "__main__":
         
         es = "es-" if args.early_stop else ""
         ss = "ss-" if args.small_sample else ""
-        best_model_path = f"../results/{ss}ht-{args.model}-ep{args.epochs}-{es}p{args.patience}-dl{args.es_delta}/lr{best_result.config['lr']}-b{best_result.config['batch_size']}/best_model.pt"
+        aug = "aug-" if args.data_aug else ""
+        best_model_path = f"../results/{ss}ht-{args.model}-{aug}ep{args.epochs}-{es}p{args.patience}-dl{args.es_delta}/lr{best_result.config['lr']}-b{best_result.config['batch_size']}/best_model.pt"
         
         test_exp = Experiment(args)
         test_exp.load_checkpoint(best_model_path)

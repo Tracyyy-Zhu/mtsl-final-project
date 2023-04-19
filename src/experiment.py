@@ -12,6 +12,7 @@ from models import Model
 from dataset import get_train_trans, get_val_trans, get_train_val_loader, test_image_loader, get_classes_indices_mapping
 
 from utils import EarlyStopping
+from torch.nn.utils import clip_grad_norm_
 
 from ray import tune, air
 from ray.air import session
@@ -19,6 +20,7 @@ from ray.tune.search.optuna import OptunaSearch
 
 import time
 import os
+import json
 from tqdm import tqdm
 
 
@@ -28,12 +30,12 @@ class Experiment:
     def __init__(self, args):
         self.args = args
         
-        classes, _, _ = get_classes_indices_mapping(self.args.data_dir)
-        self.model = Model(self.args.model, len(classes))
+        self.classes, _, _ = get_classes_indices_mapping(self.args.data_dir)
+        self.model = Model(self.args.model, len(self.classes))
         self.criterion = torch.nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.args.lr)
         
-        self.train_trans = get_train_trans(image_size=224) #TODO put image_size into args
+        self.train_trans = get_train_trans(image_size=224, data_aug=self.args.data_aug)
         self.val_trans = get_val_trans(image_size=224)
         self.train_loader, self.val_loader = get_train_val_loader(self.args.data_dir,
                                                         train_trans=self.train_trans,
@@ -76,7 +78,7 @@ class Experiment:
             loss.backward()
             
             # Potentially remove it
-            nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -94,8 +96,9 @@ class Experiment:
 
         losses = []
         correct_predictions = 0
-
+        
         with torch.no_grad():
+            cnt, acc = [0 for c in range(len(self.classes))], [0 for c in range(len(self.classes))]
             for inputs, targets in self.val_loader:
                 inputs = inputs.to(self.args.device)
                 targets = targets.to(self.args.device)
@@ -105,9 +108,17 @@ class Experiment:
                 loss = self.criterion(outputs, targets)
 
                 correct_predictions += torch.sum(preds == targets)
+                
+                
+                for c in range(len(self.classes)):
+                    acc[c] += ((preds == targets).float() @ (targets == c).float()).float().item()
+                    cnt[c] += (targets == c).sum().item()
                 losses.append(loss.item())
+    
+        for c in range(len(self.classes)):
+            acc[c] /= max(cnt[c], 1)
 
-        return correct_predictions.double() / len(self.val_loader.dataset), np.mean(losses)
+        return correct_predictions.double() / len(self.val_loader.dataset), np.mean(losses), acc
     
     def load_checkpoint(self, path):
         """
@@ -120,6 +131,9 @@ class Experiment:
         """
         Full Training function (Not for hyperparameter tuning).
         """
+        ######
+        # TODO: Save training log (per class accuracy)
+        ######
         
         if self.args.early_stop:
             early_stopper = self._init_early_stopper()
@@ -129,14 +143,15 @@ class Experiment:
             "train_acc" : [],
             "train_loss" : [],
             "val_acc" : [],
-            "val_loss" : []
+            "val_loss" : [],
+            "val_acc_per_class": []
         }
         
         self.model.to(self.args.device)
         
         print('=======Sanity Test=======')
         print()
-        val_acc, val_loss = self._eval_model()
+        val_acc, val_loss, _ = self._eval_model()
         print()
         print(f'Val loss {val_loss} accuracy {val_acc}')
         print('=========================')
@@ -153,15 +168,17 @@ class Experiment:
 
             print(f'Train loss {train_loss} accuracy {train_acc}')
 
-            val_acc, val_loss = self._eval_model()
+            val_acc, val_loss, acc_per_class = self._eval_model()
 
             print(f'Val loss {val_loss} accuracy {val_acc}')
             print()
 
             # # For visualization & record
-            history['train_acc'].append(train_acc)
+            # TODO: SAVE THE HISTORY TO A JSON
+            history['train_acc'].append(train_acc.item())
             history['train_loss'].append(train_loss)
-            history['val_acc'].append(val_acc)
+            history['val_acc'].append(val_acc.item())
+            history['val_acc_per_class'].append(acc_per_class)
             history['val_loss'].append(val_loss)
             
             if self.args.hyper_tune:
@@ -179,7 +196,11 @@ class Experiment:
                     break
         
         end = time.time()
-        print(f"Training time: {(end-start)/60:.3f} minutes")
+        print(f"INFO: Training time: {(end-start)/60:.3f} minutes")
+        
+        print(f"INFO: Saving training log to {self.args.save_dir}training-log.json")
+        with open(os.path.join(self.args.save_dir, "training-log.json"), "w") as f:
+            json.dump(history, f, indent=4)
     
     def pred_on_test(self):
         """
@@ -187,7 +208,7 @@ class Experiment:
         Return the predictions in a DataFrame.
         """
         
-        classes,_,idx_to_class = get_classes_indices_mapping(self.args.data_dir)
+        _,_,idx_to_class = get_classes_indices_mapping(self.args.data_dir)
         
         best_model = self.model
         

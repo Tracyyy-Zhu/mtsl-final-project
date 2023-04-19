@@ -22,6 +22,12 @@ def init_pretrained_model(model_name: str, num_class: int):
         model.fc = nn.Linear(in_features, num_class)
         return model
     
+    elif model_name == "resnet18":
+        model = torch.hub.load("pytorch/vision:v0.13.1", "resnet18", weights="IMAGENET1K_V1")
+        in_features = model.fc.in_features
+        model.fc = nn.Linear(in_features, num_class)
+        return model
+    
     elif model_name == "vgg16_bn":
         model = torch.hub.load("pytorch/vision:v0.13.1", "vgg16_bn", weights="IMAGENET1K_V1")
         in_features = model.classifier[6].in_features
